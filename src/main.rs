@@ -7,10 +7,10 @@ const ROWS: usize = 10812; // number of samples
 const COLS: usize = 10812;
 const MAX_ELEVATION: f32 = 3500.0; // in meters
 const SLICE_HEIGHT: f32 = 10.0; // in meters
+const OUTPUT_FILE_NAME: &str = "example.png";
 
 fn main() -> std::io::Result<()> {
     let mut input_data = BufReader::new(File::open("data/usgs_ned_13_n46w122_gridfloat.flt")?);
-    let output_file = File::create("example.png")?;
 
     let mut point_buffer = [0; 4];
     let mut image_buffer: Vec<u8> = vec![];
@@ -25,25 +25,33 @@ fn main() -> std::io::Result<()> {
         let pct_max = float_value / MAX_ELEVATION;
         let rgb: u8 = (pct_max * 255.0) as u8;
         let pixel = match rgb % 10 {
-            0 => [255, 0, 0, 255],
+            // 0 => [255, 0, 0, 255],
             _ => [rgb, rgb, rgb, 255],
         };
 
         image_buffer.extend_from_slice(&pixel);
     }
 
-    let mut encoder = png::Encoder::new(BufWriter::new(output_file), COLS as u32, ROWS as u32);
-    encoder.set_color(png::ColorType::RGBA);
-    encoder.set_depth(png::BitDepth::Eight);
-    let mut image_writer = encoder.write_header().unwrap();
+    write_image(OUTPUT_FILE_NAME, COLS as u32, ROWS as u32, &image_buffer)?;
 
-    image_writer.write_image_data(&image_buffer)?;
-
-    println!("{:?}", image_buffer.len());
+    println!("Wrote {:?} bytes to {:?}", image_buffer.len(), OUTPUT_FILE_NAME);
 
     Ok(())
 }
 
 fn to_float(i: [u8; 4]) -> f32 {
     unsafe { mem::transmute::<[u8; 4], f32>(i) }
+}
+
+fn write_image(path: &str, width: u32, height: u32, data: &[u8]) -> std::io::Result<()> {
+    let output_file = File::create(path)?;
+
+    let mut encoder = png::Encoder::new(BufWriter::new(output_file), width, height);
+    encoder.set_color(png::ColorType::RGBA);
+    encoder.set_depth(png::BitDepth::Eight);
+
+    let mut image_writer = encoder.write_header()?;
+    image_writer.write_image_data(&data)?;
+
+    Ok(())
 }
