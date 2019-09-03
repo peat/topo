@@ -1,0 +1,13 @@
+[package]
+name = "topo"
+version = "0.1.0"
+authors = ["Peat Bakke <peat@peat.org>"]
+edition = "2018"
+
+[profile.release]
+debug = true # for profiling
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+png = "0.15"
