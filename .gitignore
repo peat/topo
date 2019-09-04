@@ -1,5 +1,6 @@
 /target
 **/*.rs.bk
 **/*.png
+**/*.gif
 **/*.flt
 **/*.hdr
