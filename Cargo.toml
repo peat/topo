@@ -11,3 +11,4 @@ debug = true # for profiling
 
 [dependencies]
 png = "0.15"
+rayon = "1.2"

@@ -1,5 +1,7 @@
 // DATA AT https://www.usgs.gov/core-science-systems/ngp/tnm-delivery
 
+use rayon::prelude::*;
+
 mod depth_image;
 mod map_data;
 
@@ -11,7 +13,7 @@ const COLS: u32 = 10812;
 const STEP_SIZE: f32 = 50.0; // meters
 
 struct Elevator {
-    current: f32,
+    start: f32,
     maximum: f32,
     step: f32,
 }
@@ -19,45 +21,60 @@ struct Elevator {
 impl Elevator {
     pub fn new(start: f32, maximum: f32, step: f32) -> Elevator {
         Elevator {
+            start,
             maximum,
-            current: start,
             step,
         }
     }
-}
 
-impl Iterator for Elevator {
-    type Item = f32;
-
-    fn next(&mut self) -> Option<f32> {
-        self.current += self.step;
-        if self.current > self.maximum {
-            None
-        } else {
-            Some(self.current)
+    pub fn steps(&self) -> Vec<f32> {
+        let mut output = vec![];
+        let mut next_step = self.start;
+        while next_step < self.maximum {
+            output.push(next_step);
+            next_step += self.step;
         }
+
+        output
     }
 }
 
 fn main() -> std::io::Result<()> {
-    // let map_data = MapData::open("data/usgs_ned_13_n46w122_gridfloat.flt", ROWS, COLS)?; // hood
-    let map_data = MapData::open("data/usgs_ned_13_n47w123_gridfloat.flt", ROWS, COLS)?; // helens
+    // let flt_path = "data/usgs_ned_13_n47w123_gridfloat.flt"; // helens
+    let flt_path = "data/usgs_ned_13_n46w122_gridfloat.flt"; // hood
 
+    print!("Importing {} ... ", flt_path);
+    let map_data = MapData::open(flt_path, ROWS, COLS)?;
+    println!(
+        "{} points. Elevation: {:.1}-{:.1} meters.",
+        map_data.values.len(),
+        map_data.min_elevation,
+        map_data.max_elevation
+    );
+
+    println!("Extracting slices at {}m intervals ...", STEP_SIZE);
     let elevator = Elevator::new(map_data.min_elevation, map_data.max_elevation, STEP_SIZE);
 
-    for (index, elevation) in elevator.enumerate() {
-        let map_slice = map_data.elevation_slice(elevation);
-        if map_slice.is_empty() {
-            continue;
-        }
+    elevator
+        .steps()
+        .par_iter()
+        .enumerate()
+        .for_each(|(index, elevation)| {
+            let map_slice = map_data.elevation_slice(*elevation);
+            if map_slice.is_empty() {
+                return;
+            }
 
-        let image_data = DepthImage::from(&map_slice);
-        let image_path = format!("output/example-{:04}.png", index);
+            let image_data = DepthImage::from(&map_slice);
+            let image_path = format!("output/example-{:04}.png", index);
 
-        image_data.write(&image_path)?;
+            if image_data.write(&image_path).is_err() {
+                println!("Error saving {}!", image_path);
+                return;
+            };
 
-        println!("{:?}", image_path);
-    }
+            println!(" {:.1}m -> {}", elevation, image_path);
+        });
 
     Ok(())
 }
