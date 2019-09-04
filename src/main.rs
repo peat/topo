@@ -1,57 +1,63 @@
-use std::fs::File;
-use std::io::prelude::*;
-use std::mem;
-use std::io::{BufWriter, BufReader};
+// DATA AT https://www.usgs.gov/core-science-systems/ngp/tnm-delivery
 
-const ROWS: usize = 10812; // number of samples
-const COLS: usize = 10812;
-const MAX_ELEVATION: f32 = 3500.0; // in meters
-const SLICE_HEIGHT: f32 = 10.0; // in meters
-const OUTPUT_FILE_NAME: &str = "example.png";
+mod depth_image;
+mod map_data;
+
+use depth_image::*;
+use map_data::*;
+
+const ROWS: u32 = 10812; // number of samples
+const COLS: u32 = 10812;
+const STEP_SIZE: f32 = 50.0; // meters
+
+struct Elevator {
+    current: f32,
+    maximum: f32,
+    step: f32,
+}
+
+impl Elevator {
+    pub fn new(start: f32, maximum: f32, step: f32) -> Elevator {
+        Elevator {
+            maximum,
+            current: start,
+            step,
+        }
+    }
+}
+
+impl Iterator for Elevator {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<f32> {
+        self.current += self.step;
+        if self.current > self.maximum {
+            None
+        } else {
+            Some(self.current)
+        }
+    }
+}
 
 fn main() -> std::io::Result<()> {
-    let mut input_data = BufReader::new(File::open("data/usgs_ned_13_n46w122_gridfloat.flt")?);
+    // let map_data = MapData::open("data/usgs_ned_13_n46w122_gridfloat.flt", ROWS, COLS)?; // hood
+    let map_data = MapData::open("data/usgs_ned_13_n47w123_gridfloat.flt", ROWS, COLS)?; // helens
 
-    let mut point_buffer = [0; 4];
-    let mut image_buffer: Vec<u8> = vec![];
-    image_buffer.reserve(COLS * ROWS * 4);
+    let elevator = Elevator::new(map_data.min_elevation, map_data.max_elevation, STEP_SIZE);
 
-    while let Ok(bytes) = input_data.read(&mut point_buffer) {
-        if bytes == 0 {
-            break;
+    for (index, elevation) in elevator.enumerate() {
+        let map_slice = map_data.elevation_slice(elevation);
+        if map_slice.is_empty() {
+            continue;
         }
 
-        let float_value = to_float(point_buffer);
-        let pct_max = float_value / MAX_ELEVATION;
-        let rgb: u8 = (pct_max * 255.0) as u8;
-        let pixel = match rgb % 10 {
-            // 0 => [255, 0, 0, 255],
-            _ => [rgb, rgb, rgb, 255],
-        };
+        let image_data = DepthImage::from(&map_slice);
+        let image_path = format!("output/example-{:04}.png", index);
 
-        image_buffer.extend_from_slice(&pixel);
+        image_data.write(&image_path)?;
+
+        println!("{:?}", image_path);
     }
-
-    write_image(OUTPUT_FILE_NAME, COLS as u32, ROWS as u32, &image_buffer)?;
-
-    println!("Wrote {:?} bytes to {:?}", image_buffer.len(), OUTPUT_FILE_NAME);
-
-    Ok(())
-}
-
-fn to_float(i: [u8; 4]) -> f32 {
-    unsafe { mem::transmute::<[u8; 4], f32>(i) }
-}
-
-fn write_image(path: &str, width: u32, height: u32, data: &[u8]) -> std::io::Result<()> {
-    let output_file = File::create(path)?;
-
-    let mut encoder = png::Encoder::new(BufWriter::new(output_file), width, height);
-    encoder.set_color(png::ColorType::RGBA);
-    encoder.set_depth(png::BitDepth::Eight);
-
-    let mut image_writer = encoder.write_header()?;
-    image_writer.write_image_data(&data)?;
 
     Ok(())
 }
