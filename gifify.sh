@@ -1,19 +1,23 @@
 #!/bin/bash
 
-SIZE="640x640"
+SIZE="1024x1024"
 DELAY=10
 
 echo "Resizing to $SIZE ..."
 
-rm $1/*.frame.png
+rm -f $1/*.small.png;
 for i in $1/*.png; do
     echo " $i"
-    gm convert -size $SIZE $i -resize $SIZE $i.frame.png
+    gm convert -size $SIZE $i -resize $SIZE $i.small.png
 done
 
 echo
-echo "Converting frames to GIF ..."
-gm convert $1/*.frame.png -delay $DELAY $1/animated.gif
+echo "Creating slice GIF ..."
+gm convert $1/slice*.small.png -delay $DELAY $1/animated-slices.gif
 
 echo
-echo "Done! => $1/animated.gif"
+echo "Creating edge GIF ..."
+gm convert $1/edge*.small.png -delay $DELAY $1/animated-edges.gif
+
+echo
+echo "Done!"

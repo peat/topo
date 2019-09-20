@@ -1,4 +1,5 @@
 use crate::map_data::MapData;
+use crate::edge_finder::EdgeFinder;
 
 use std::fs::File;
 use std::io::BufWriter;
@@ -26,6 +27,27 @@ impl From<&MapData> for DepthImage {
         }
 
         output
+    }
+} 
+
+impl From<&EdgeFinder> for DepthImage {
+    fn from (source: &EdgeFinder) -> DepthImage {
+        let mut output = DepthImage {
+            width: source.width,
+            height: source.width,
+            values: vec![],
+        };
+
+        for point in source.values.iter() {
+            let pixel = match point {
+                true => [255, 255, 255, 255],
+                false => [0, 0, 0, 255],
+            };
+
+            output.values.extend_from_slice(&pixel);
+        }
+
+        output        
     }
 }
 

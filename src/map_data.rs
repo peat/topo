@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -78,6 +79,14 @@ impl MapData {
         }
 
         true
+    }
+
+    pub fn get(&self, x: u32, y: u32) -> Option<&f32> {
+        self.values.get(self.index_of(x, y))
+    }
+
+    fn index_of(&self, x: u32, y: u32) -> usize {
+        (x + (y * self.rows)).try_into().unwrap()
     }
 
     fn buffer_to_float(buffer: [u8; 4]) -> f32 {

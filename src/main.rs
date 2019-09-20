@@ -2,11 +2,16 @@
 
 use rayon::prelude::*;
 
+use std::io::Write;
+use std::io::stdout;
+
 mod depth_image;
+mod edge_finder;
 mod map_data;
 
 use depth_image::*;
 use map_data::*;
+use edge_finder::*;
 
 const ROWS: u32 = 10812; // number of samples
 const COLS: u32 = 10812;
@@ -52,6 +57,10 @@ fn main() -> std::io::Result<()> {
         map_data.max_elevation
     );
 
+    println!("Saving height-map.png ...");
+    let height_map = DepthImage::from(&map_data);
+    height_map.write("output/height-map.png")?;
+
     println!("Extracting slices at {}m intervals ...", STEP_SIZE);
     let elevator = Elevator::new(map_data.min_elevation, map_data.max_elevation, STEP_SIZE);
 
@@ -65,16 +74,25 @@ fn main() -> std::io::Result<()> {
                 return;
             }
 
-            let image_data = DepthImage::from(&map_slice);
-            let image_path = format!("output/example-{:04}.png", index);
-
-            if image_data.write(&image_path).is_err() {
-                println!("Error saving {}!", image_path);
+            let edge_data = EdgeFinder::from(&map_slice);
+            let edge_image = DepthImage::from(&edge_data);
+            let edge_path = format!("output/edge-{:04}.png", index);
+            if edge_image.write(&edge_path).is_err() {
+                println!("Error saving {}!", edge_path);
                 return;
             };
 
-            println!(" {:.1}m -> {}", elevation, image_path);
+            // let image_data = DepthImage::from(&map_slice);
+            // let image_path = format!("output/slice-{:04}.png", index);
+            // if image_data.write(&image_path).is_err() {
+            //     println!("Error saving {}!", image_path);
+            //     return;
+            // };
+
+            print!(".");
+            let _ = stdout().flush();
         });
 
+    println!();
     Ok(())
 }
